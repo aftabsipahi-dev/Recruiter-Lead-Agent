@@ -11,11 +11,18 @@ SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID", "1EEvBiLzCWZewuWXlbPpqBjriCPIT
 APOLLO_API_KEY = os.environ.get("APOLLO_API_KEY")  # Get free API key from apollo.io or similar provider
 
 def get_google_sheet_client():
+    if not GOOGLE_CREDS_JSON:
+        raise ValueError("Missing GOOGLE_CREDENTIALS_JSON secret in GitHub Actions settings.")
+    
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
     ]
-    creds_dict = json.loads(GOOGLE_CREDS_JSON)
+    try:
+        creds_dict = json.loads(GOOGLE_CREDS_JSON)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"GOOGLE_CREDENTIALS_JSON is not valid JSON. Please re-paste the full key file content. Error: {e}")
+        
     credentials = Credentials.from_service_account_info(creds_dict, scopes=scopes)
     client = gspread.authorize(credentials)
     return client
