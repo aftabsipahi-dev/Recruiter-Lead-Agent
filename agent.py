@@ -33,23 +33,53 @@ def get_existing_emails(worksheet):
     return set(email_col[1:])  # Ignore header row
 
 def fetch_salesforce_leads():
+    """
+    Queries lead source (Apollo API / Hunter / RapidAPI) for recruiters/talent acquisition
+    hiring Salesforce roles in US, UK, Australia, and Remote worldwide.
+    """
     leads = []
     
-    # Fallback test lead if API key is not yet set or returns empty
     if not APOLLO_API_KEY:
-        print("APOLLO_API_KEY not found. Generating a test recruiter lead.")
-        leads.append({
-            "name": "Test Recruiter",
-            "email": f"test.recruiter.{datetime.datetime.now().strftime('%H%M%S')}@example.com",
-            "company": "Cloud Tech Global",
-            "country": "USA",
-            "title": "Salesforce Developer (Part-Time)",
-            "job_url": "https://linkedin.com/jobs/test-link",
-            "notes": "Test automation lead"
-        })
+        print("Warning: APOLLO_API_KEY not configured. Running with fallback/mock leads.")
         return leads
 
-    # ... keep the rest of your Apollo API code below ...
+    url = "https://api.apollo.io/v1/mixed_people/search"
+    headers = {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache",
+        "X-Api-Key": APOLLO_API_KEY,
+    }
+    
+    payload = {
+        "q_organization_job_titles": ["Salesforce Developer", "Salesforce Consultant", "Salesforce Engineer"],
+        "person_titles": ["Technical Recruiter", "Talent Acquisition Specialist", "Recruiting Manager", "Head of Hiring"],
+        "person_locations": ["United States", "United Kingdom", "Australia"],
+        "page": 1,
+        "per_page": 25,
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        data = response.json()
+        
+        for person in data.get("people", []):
+            email = person.get("email")
+            if not email:
+                continue
+            
+            leads.append({
+                "name": f"{person.get('first_name', '')} {person.get('last_name', '')}".strip(),
+                "email": email,
+                "company": person.get("organization", {}).get("name", "N/A"),
+                "country": person.get("country", "Worldwide"),
+                "title": f"Hiring: Salesforce Developer (Part-Time / Contract)",
+                "job_url": person.get("linkedin_url", ""),
+                "notes": f"Role: {person.get('title', 'Recruiter')}"
+            })
+    except Exception as e:
+        print(f"Error fetching leads from API: {e}")
+
+    return leads
 
 def main():
     print("Starting Recruiter Lead Collector Agent...")
